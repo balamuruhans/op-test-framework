@@ -1,0 +1,1 @@
+avocado run migrate.default.tcp --vt-type=qemu --vt-qemu-bin /usr/share/avocado-plugins-vt/bin/install_root/bin/qemu-system-ppc64 --vt-guest-os JeOS.27.ppc64le --vt-extra-params kernel=/home/bala/linux/vmlinux kernel_params='root=/dev/vda2 rw console=hvc0,115200 init=/sbin/init initcall_debug' --vt-qemu-dst-bin /usr/share/avocado-plugins-vt/bin/install_root/bin/qemu-system-ppc64

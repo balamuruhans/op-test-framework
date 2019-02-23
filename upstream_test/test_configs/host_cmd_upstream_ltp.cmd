@@ -1,0 +1,1 @@
+avocado run avocado_guest.ltp --vt-type libvirt --vt-extra-params kernel=/home/bala/linux/vmlinux kernel_args='root=/dev/sda2 rw console=tty0 console=ttyS0,115200 init=/sbin/init initcall_debug selinux=0' qemu_binary=/usr/share/avocado-plugins-vt/bin/install_root/bin/qemu-system-ppc64 initrd='' --vt-only-filter "JeOS.27.ppc64le qcow2 virtio_scsi"

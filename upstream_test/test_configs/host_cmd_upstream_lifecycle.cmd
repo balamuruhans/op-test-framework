@@ -1,0 +1,3 @@
+# download lifecycle config and execute the test
+wget https://raw.githubusercontent.com/balamuruhans/op-test-framework/upstream_test/upstream_test/lifecycle.cfg -O /home/bala/data/avocado-vt/backends/libvirt/cfg/lifeycle.cfg
+avocado run --vt-config /home/bala/data/avocado-vt/backends/libvirt/cfg/lifecycle.cfg --vt-type libvirt --vt-extra-params kernel=/home/bala/linux/vmlinux kernel_args='root=/dev/sda2 rw console=tty0 console=ttyS0,115200 init=/sbin/init initcall_debug selinux=0' qemu_binary=/usr/share/avocado-plugins-vt/bin/install_root/bin/qemu-system-ppc64 initrd='' --vt-only-filter "JeOS.27.ppc64le qcow2 virtio_scsi"
