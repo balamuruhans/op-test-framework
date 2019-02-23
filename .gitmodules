@@ -1,0 +1,3 @@
+[submodule "upstream_test/machine_configs"]
+	path = upstream_test/machine_configs
+	url = git@github.ibm.com:balamuruhans/machine_configs.git
