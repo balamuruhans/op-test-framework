@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # OpenPOWER Automated Test Project
 #
 # Contributors Listed Below - COPYRIGHT 2017
@@ -35,6 +35,8 @@ from common.OpTestConstants import OpTestConstants as BMC_CONST
 from common.Exceptions import CommandFailed
 from common import OpTestInstallUtil
 
+import socket
+
 import logging
 import OpTestLogger
 log = OpTestLogger.optest_logger_glob.get_logger(__name__)
@@ -53,6 +55,7 @@ class gcov():
     all the nice usual ways of transferring files around. The good news is that
     implementing a simple HTTP POST request in shell isn't that hard.
     '''
+
     def setUp(self):
         conf = OpTestConfiguration.conf
         self.cv_HOST = conf.host()
@@ -62,50 +65,62 @@ class gcov():
 
     def runTest(self):
         self.setup_test()
-	try:
+        try:
             exports = self.c.run_command(
                 "ls -1 --color=never /sys/firmware/opal/exports/")
-	except CommandFailed as cf:
-	    log.debug("exports cf.output={}".format(cf.output))
-	    exports = "EMPTY"
+        except CommandFailed as cf:
+            log.debug("exports cf.output={}".format(cf.output))
+            exports = "EMPTY"
         if 'gcov' not in exports:
             self.skipTest("Not a GCOV build")
 
         l = self.c.run_command("wc -c /sys/firmware/opal/exports/gcov")
         iutil = OpTestInstallUtil.InstallUtil()
-        my_ip = iutil.get_server_ip()
+        try:
+            my_ip = iutil.get_server_ip()
+            log.debug("my_ip={}".format(my_ip))
+        except Exception as e:
+            log.debug("get_server_ip Exception={}".format(e))
+            self.fail(
+                "Unable to get the IP from Petitboot or Host, check that the IP's are configured")
         if not my_ip:
-            self.fail("unable to get the ip from host")
-        port = iutil.start_server(my_ip)
+            self.fail(
+                "We failed to get the IP from Petitboot or Host, check that the IP's are configured")
 
-        url = 'http://{}:{}/upload'.format(my_ip, port)
-        insanity = "(echo 'POST /upload/gcov HTTP/1.1'; \n"
-        insanity += "echo 'Host: {}:{}';\n".format(my_ip, port)
-        insanity += "echo 'Content-length: {}';\n".format(l[0])
-        insanity += "echo 'Origin: http://{}:{}'; \n".format(my_ip, port)
-        boundary = "OhGoodnessWhyDoIHaveToDoThis"
-        insanity += "echo 'Content-Type: multipart/form-data; "
-        insanity += "boundary={}';\n".format(boundary)
-        insanity += "echo; echo '--{}'; \n".format(boundary)
-        insanity += "echo 'Content-Disposition: form-data; name=\"file\"; "
-        insanity += "filename=\"gcov\"'; \n"
-        insanity += "echo 'Content-Type: application/octet-stream'; echo; \n"
-        insanity += "cat /sys/firmware/opal/exports/gcov; \n"
-        insanity += "echo; echo '--{}--';\n".format(boundary)
-        insanity += ") | nc {} {}".format(my_ip, port)
-        self.c.run_command(insanity)
+        HOST, PORT = "0.0.0.0", 0
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((HOST, PORT))
+            port = s.getsockname()[1]
+            s.listen(1)
+            print(("# TCP Listening on %s" % port))
 
-        global NR_GCOV_DUMPS
-        NR_GCOV_DUMPS = NR_GCOV_DUMPS + 1
-        filename = os.path.join(self.gcov_dir,'gcov-saved-{}'.format(NR_GCOV_DUMPS))
-        with open(filename, 'wb') as f:
-            f.write(iutil.get_uploaded_file('gcov'))
+            insanity = "cat /sys/firmware/opal/exports/gcov "
+            insanity += "| nc {} {}\n".format(my_ip, port)
+            self.c.get_console().send(insanity)
+            conn, addr = s.accept()
+            with conn:
+                print('Connected by ', addr)
+
+                global NR_GCOV_DUMPS
+                NR_GCOV_DUMPS = NR_GCOV_DUMPS + 1
+                filename = os.path.join(
+                    self.gcov_dir, 'gcov-saved-{}'.format(NR_GCOV_DUMPS))
+                with open(filename, 'wb') as f:
+                    size = int(l[0].split()[0])
+                    while size:
+                        data = conn.recv(4096)
+                        size = size - len(data)
+                        if not data: break
+                        f.write(data)
+            self.c.get_console().expect('#')
+        self.c.run_command('echo Hello')
 
 
 class Skiroot(gcov, unittest.TestCase):
     '''
     Extract GCOV code coverage in skiroot environment.
     '''
+
     def setup_test(self):
         self.cv_SYSTEM.goto_state(OpSystemState.PETITBOOT_SHELL)
         self.c = self.cv_SYSTEM.console
@@ -115,6 +130,7 @@ class Host(gcov, unittest.TestCase):
     '''
     Extract GCOV code coverage from a host OS.
     '''
+
     def setup_test(self):
         self.cv_SYSTEM.goto_state(OpSystemState.OS)
         self.c = self.cv_SYSTEM.cv_HOST.get_ssh_connection()

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # IBM_PROLOG_BEGIN_TAG
 # This is an automatically generated prolog.
 #
@@ -44,7 +44,7 @@ import re
 import sys
 import os
 import random
-import commands
+import subprocess
 
 
 from common.OpTestConstants import OpTestConstants as BMC_CONST
@@ -59,6 +59,7 @@ import logging
 import OpTestLogger
 log = OpTestLogger.optest_logger_glob.get_logger(__name__)
 
+
 class OpTestPrdDaemon(unittest.TestCase):
     '''
     This function performs below steps
@@ -69,6 +70,7 @@ class OpTestPrdDaemon(unittest.TestCase):
     3. Kill the opal-prd daemon using its PID
     4. Again check if opal-prd daemon spawns back
     '''
+
     def setUp(self):
         conf = OpTestConfiguration.conf
         self.cv_SYSTEM = conf.system()
@@ -80,7 +82,9 @@ class OpTestPrdDaemon(unittest.TestCase):
         l_res = None
 
         if not self.cv_HOST.host_prd_supported(self.bmc_type):
-            self.skipTest("opal-prd not supported on this system")
+            log.debug(
+                "opal-prd NOT supported on this system, bmc_type={}".format(self.bmc_type))
+            self.skipTest("opal-prd.service is NOT supported on this system")
 
         # Check opal-prd command
         self.cv_HOST.host_check_command("opal-prd")
@@ -88,24 +92,45 @@ class OpTestPrdDaemon(unittest.TestCase):
         # To check opal-prd daemon is running or not
         try:
             l_res = self.cv_HOST.host_run_command("pidof opal-prd")
+            log.debug("pidof opal-prd output={}".format(l_res))
         except CommandFailed as c:
-            self.cv_HOST.host_run_command("/bin/systemctl start opal-prd.service")
             try:
+                start_res = self.cv_HOST.host_run_command(
+                    "/bin/systemctl start opal-prd.service")
+                log.debug(
+                    "We had to attempt startng opal-prd (which means it was NOT running) output={}".format(start_res))
                 l_res = self.cv_HOST.host_run_command("pidof opal-prd")
+                log.debug(
+                    "Second attempt pidof opal-prd output={}".format(l_res))
             except CommandFailed as c:
-                self.assertEqual(c.exitcode, 0, "Failed to start opal-prd daemon:Need to raise a bug: %s" % str(c))
+                log.debug(
+                    "CommandFailed starting or getting pidof opal-prd, we probably didn't get a PID")
+                self.assertEqual(
+                    c.exitcode, 0, "We failed to start the opal-prd.service, raise a bug: {}".format(c))
 
-        # To kill the opal-prd daemon using its PID
-        l_cmd = "kill -9 %d" % int(l_res[0])
-        l_res = self.cv_HOST.host_run_command(l_cmd)
-
-        # To check if opal-prd daemon is spawned again even after killing
+        # Kill the opal-prd daemon using its PID
         try:
-            l_res = self.cv_HOST.host_run_command("pidof opal-prd")
+            l_cmd = "kill -9 %d" % int(l_res[0])
+            l_res = self.cv_HOST.host_run_command(l_cmd)
+            log.debug("kill -9 output={}".format(l_res))
         except CommandFailed as c:
-            self.assertEqual(c.exitcode, 0, "opal-prd daemon is not running always:Need to raise a bug: %s" % str(c))
+            log.debug(
+                "CommandFailed trying to kill opal-prd.service, CommandFailed={}".format(c))
+            self.assertEqual(
+                c.exitcode, 0, "We failed to kill the opal-prd.service (it may have died) raise a bug: {}".format(c))
 
-        log.debug("opal-prd daemon is always running")
+        # Check if opal-prd daemon is spawned again after killing
+        try:
+            time.sleep(5)  # give time to either die or stay alive
+            l_res = self.cv_HOST.host_run_command("pidof opal-prd")
+            log.debug(
+                "Verify opal-prd.service pidof opal-prd output={}".format(l_res))
+        except CommandFailed as c:
+            log.debug(
+                "CommandFailed getting pidof opal-prd, we probably didn't get a PID")
+            self.assertEqual(
+                c.exitcode, 0, "We were not able to keep the opal-prd.service running, raise a bug: {}".format(c))
+
+        log.debug("opal-prd.service was able to stay running!")
 
         return BMC_CONST.FW_SUCCESS
-

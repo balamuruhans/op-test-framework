@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # IBM_PROLOG_BEGIN_TAG
 # This is an automatically generated prolog.
 #
@@ -37,7 +37,7 @@ on fast-reset system will be added here.
 import time
 import pexpect
 import subprocess
-import commands
+import subprocess
 import re
 import sys
 
@@ -59,12 +59,19 @@ class OpTestFastReboot(unittest.TestCase):
         self.cv_HOST = conf.host()
         self.cv_IPMI = conf.ipmi()
         self.cv_SYSTEM = conf.system()
+        self.bmc_type = conf.args.bmc_type
 
     def number_reboots_to_do(self):
         return 2
 
     def boot_to_os(self):
         return False
+
+    def do_things_while_booted(self):
+        pass
+
+    def reboot_command(self):
+        return "reboot"
 
     def get_fast_reset_count(self, c):
         count = 0
@@ -90,6 +97,10 @@ class OpTestFastReboot(unittest.TestCase):
         It will check booting sequence when reboot command
         getting executed in both petitboot and host OS
         '''
+
+        if "qemu" in self.bmc_type:
+            self.skipTest("Qemu platform doesn't have fast-reboot support")
+
         if self.boot_to_os():
             self.cv_SYSTEM.goto_state(OpSystemState.OS)
         else:
@@ -103,9 +114,9 @@ class OpTestFastReboot(unittest.TestCase):
             # skipTest throws exception when passing null at end
             # exception from skipTest produces malformed XML
             if fast_reboot_state[:4] != "okay":
-                    self.skipTest("Fast reboot currently NOT supported, "
-                        "/proc/device-tree/ibm,opal/fast-reboot: {}"
-                                  .format(fast_reboot_state[:-1]))
+                self.skipTest("Fast reboot currently NOT supported, "
+                              "/proc/device-tree/ibm,opal/fast-reboot: {}"
+                              .format(fast_reboot_state[:-1]))
         except CommandFailed as cf:
             if cf.exitcode is not 1:
                 raise cf
@@ -134,7 +145,7 @@ class OpTestFastReboot(unittest.TestCase):
             # We do some funny things with the raw pty here, as
             # 'reboot' isn't meant to return
             self.pty = self.cv_SYSTEM.console.get_console()
-            self.pty.sendline("reboot")
+            self.pty.sendline(self.reboot_command())
             self.cv_SYSTEM.set_state(OpSystemState.IPLing)
             # We're looking for a skiboot log message, that it's doing fast
             # reboot. We *may* not get this, as on some systems (notably IBM
@@ -156,6 +167,7 @@ class OpTestFastReboot(unittest.TestCase):
             self.assertTrue(initialResetCount < newResetCount,
                             "Did not do fast reboot")
             log.debug("Completed Fast reboot cycle %d" % i)
+            self.do_things_while_booted()
 
         c.run_command(BMC_CONST.NVRAM_DISABLE_FAST_RESET_MODE)
         try:
@@ -179,6 +191,26 @@ class FastRebootHostTorture(FastRebootHost):
 
     def number_reboots_to_do(self):
         return 1000
+
+
+class FastRebootHostStress(FastRebootHost):
+    def number_reboots_to_do(self):
+        return 2
+
+    def reboot_command(self):
+        return "reboot -ff"
+
+    def do_things_while_booted(self):
+        c = self.cv_SYSTEM.console
+        c.run_command(
+            "stress --cpu `nproc` --vm `nproc` --vm-bytes 128M > /dev/null &")
+        c.run_command("sleep 120", timeout=200)
+        c.run_command("uptime")
+
+
+class FastRebootHostStressTorture(FastRebootHostStress):
+    def number_reboots_to_do(self):
+        return 200
 
 
 class FastRebootTorture(OpTestFastReboot):

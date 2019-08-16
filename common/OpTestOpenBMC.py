@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # OpenPOWER Automated Test Project
 #
 # Contributors Listed Below - COPYRIGHT 2017
@@ -26,32 +26,37 @@ import subprocess
 import json
 import requests
 import cgi
+import os
 
-from OpTestSSH import OpTestSSH
-from OpTestBMC import OpTestBMC
-from Exceptions import HTTPCheck
-from OpTestConstants import OpTestConstants as BMC_CONST
-import OpTestSystem
+from .OpTestSSH import OpTestSSH
+from .OpTestBMC import OpTestBMC
+from .Exceptions import HTTPCheck
+from .Exceptions import CommandFailed
+from .OpTestConstants import OpTestConstants as BMC_CONST
+from . import OpTestSystem
 
 import logging
 import OpTestLogger
 log = OpTestLogger.optest_logger_glob.get_logger(__name__)
+
 
 class HostManagement():
     '''
     HostManagement Class
     OpenBMC methods to manage the Host
     '''
+
     def __init__(self, conf=None,
-                    ip=None,
-                    username=None,
-                    password=None):
+                 ip=None,
+                 username=None,
+                 password=None):
         self.conf = conf
         self.util = conf.util
         self.hostname = ip
         self.username = username
         self.password = password
-        self.util.PingFunc(self.hostname, totalSleepTime=BMC_CONST.PING_RETRY_FOR_STABILITY)
+        self.util.PingFunc(
+            self.hostname, totalSleepTime=BMC_CONST.PING_RETRY_FOR_STABILITY)
         if self.conf.util_bmc_server is None:
             self.conf.util.setup(config='REST')
         r = self.conf.util_bmc_server.login()
@@ -105,8 +110,9 @@ class HostManagement():
         "data": "xyz.openbmc_project.State.Host.Transition.Reboot"
         '''
         uri = "/xyz/openbmc_project/state/host0/attr/RequestedHostTransition"
-        payload = {"data" : "xyz.openbmc_project.State.Host.Transition.Reboot"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": "xyz.openbmc_project.State.Host.Transition.Reboot"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def hard_reboot(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -116,8 +122,9 @@ class HostManagement():
         "data": "xyz.openbmc_project.State.Host.Transition.Reboot"
         '''
         uri = "/xyz/openbmc_project/state/host0/attr/RequestedHostTransition"
-        payload = {"data" : "xyz.openbmc_project.State.Host.Transition.Reboot"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": "xyz.openbmc_project.State.Host.Transition.Reboot"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def power_soft(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -127,8 +134,9 @@ class HostManagement():
         "data": "xyz.openbmc_project.State.Chassis.Transition.Off"
         '''
         uri = "xyz/openbmc_project/state/chassis0/attr/RequestedPowerTransition"
-        payload = {"data" : "xyz.openbmc_project.State.Chassis.Transition.Off"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": "xyz.openbmc_project.State.Chassis.Transition.Off"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def power_off(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -143,11 +151,13 @@ class HostManagement():
         '''
         uri = "/xyz/openbmc_project/state/chassis0/attr/RequestedPowerTransition"
         payload = {"data": "xyz.openbmc_project.State.Chassis.Transition.Off"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
         uri = "/xyz/openbmc_project/state/host0/attr/RequestedHostTransition"
         payload = {"data": "xyz.openbmc_project.State.Host.Transition.Off"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def power_on(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -157,8 +167,9 @@ class HostManagement():
         "data": "xyz.openbmc_project.State.Host.Transition.On"
         '''
         uri = "/xyz/openbmc_project/state/host0/attr/RequestedHostTransition"
-        payload = {"data" : "xyz.openbmc_project.State.Host.Transition.On"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": "xyz.openbmc_project.State.Host.Transition.On"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def list_sel(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -168,9 +179,10 @@ class HostManagement():
         "data" : []
         '''
         log.debug("List of SEL entries")
-        payload = {"data" : []}
+        payload = {"data": []}
         uri = "/xyz/openbmc_project/logging/enumerate"
-        r = self.conf.util_bmc_server.get(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.get(
+            uri=uri, json=payload, minutes=minutes)
         return r.json()
 
     def pull_ids(self, sels=None):
@@ -207,47 +219,61 @@ class HostManagement():
         for j in id_list:
             dict_item = {}
             dict_item['Id'] = str(json_data['data'][sel_dict.get(j)].get('Id'))
-            dict_item['Timestamp'] = datetime.datetime.fromtimestamp(int(str(json_data['data'][sel_dict.get(j)].get('Timestamp')))/1000).strftime("%Y-%m-%d %H:%M:%S")
-            dict_item['Message'] = json_data['data'][sel_dict.get(j)].get('Message')
-            dict_item['Description'] = json_data['data'][sel_dict.get(j)].get('Description')
-            dict_item['Severity'] = json_data['data'][sel_dict.get(j)].get('Severity').split('.')[-1]
-            dict_item['Resolved'] = json_data['data'][sel_dict.get(j)].get('Resolved')
-            dict_item['EventID'] = json_data['data'][sel_dict.get(j)].get('EventID')
+            dict_item['Timestamp'] = datetime.datetime.fromtimestamp(int(str(
+                json_data['data'][sel_dict.get(j)].get('Timestamp')))/1000).strftime("%Y-%m-%d %H:%M:%S")
+            dict_item['Message'] = json_data['data'][sel_dict.get(j)].get(
+                'Message')
+            dict_item['Description'] = json_data['data'][sel_dict.get(j)].get(
+                'Description')
+            dict_item['Severity'] = json_data['data'][sel_dict.get(j)].get(
+                'Severity').split('.')[-1]
+            dict_item['Resolved'] = json_data['data'][sel_dict.get(j)].get(
+                'Resolved')
+            dict_item['EventID'] = json_data['data'][sel_dict.get(j)].get(
+                'EventID')
             add_data = json_data['data'][sel_dict.get(j)]['AdditionalData']
             for i in range(len(add_data)):
                 if ("ESEL" in add_data[i]):
-                    dict_item['esel'] = add_data[i].strip().split('=')[1].replace(" ", "")
+                    dict_item['esel'] = add_data[i].strip().split('=')[
+                        1].replace(" ", "")
                 if ("PROCEDURE" in add_data[i]):
                     dict_item['Procedure'] = str(add_data[i].split('=')[1])
             dict_list.append(dict_item)
 
         if dump:
-            print "\n----------------------------------------------------------------------"
-            print "SELs"
-            print "----------------------------------------------------------------------"
+            print(
+                "\n----------------------------------------------------------------------")
+            print("SELs")
+            print(
+                "----------------------------------------------------------------------")
             if len(id_list) == 0:
-                print "SEL has no entries"
+                print("SEL has no entries")
             for k in dict_list:
-                print "Id          : {}".format(k.get('Id'))
-                print "Message     : {}".format(k.get('Message'))
-                print "Description : {}".format(k.get('Description'))
-                print "Timestamp   : {}".format(k.get('Timestamp'))
-                print "Severity    : {}".format(k.get('Severity'))
-                print "Resolved    : {}".format(k.get('Resolved'))
+                print(("Id          : {}".format(k.get('Id'))))
+                print(("Message     : {}".format(k.get('Message'))))
+                print(("Description : {}".format(k.get('Description'))))
+                print(("Timestamp   : {}".format(k.get('Timestamp'))))
+                print(("Severity    : {}".format(k.get('Severity'))))
+                print(("Resolved    : {}".format(k.get('Resolved'))))
                 if k.get('EventID') is not None:
-                    print "EventID     : {}".format(k.get('EventID'))
+                    print(("EventID     : {}".format(k.get('EventID'))))
                 if k.get('Procedure') is not None:
-                    print "Procedure   : {}".format(k.get('Procedure'))
+                    print(("Procedure   : {}".format(k.get('Procedure'))))
                 if k.get('esel') is not None:
-                    print "ESEL        : characters={}\n".format(len(k.get('esel')))
-                    print "Ruler        : 0123456789012345678901234567890123456789012345678901234567890123"
-                    print "-------------------------------------------------------------------------------"
+                    print(("ESEL        : characters={}\n".format(
+                        len(k.get('esel')))))
+                    print(
+                        "Ruler        : 0123456789012345678901234567890123456789012345678901234567890123")
+                    print(
+                        "-------------------------------------------------------------------------------")
                     for j in range(0, len(k.get('esel')), 64):
-                        print "{:06d}-{:06d}: {}".format(j, j+63, k.get('esel')[j:j+64])
+                        print(("{:06d}-{:06d}: {}".format(j,
+                                                          j+63, k.get('esel')[j:j+64])))
                 else:
-                    print "ESEL        : None"
-                print "\n"
-            print "----------------------------------------------------------------------"
+                    print("ESEL        : None")
+                print("\n")
+            print(
+                "----------------------------------------------------------------------")
         # sample id_list ['81', '82', '83', '84']
         log.debug("id_list={}".format(id_list))
         log.debug("dict_list={}".format(dict_list))
@@ -265,9 +291,11 @@ class HostManagement():
         log.debug("list={}".format(list))
         log.debug("dict_list={}".format(dict_list))
         for id in list:
-            uri = "/xyz/openbmc_project/logging/entry/{}/action/Delete".format(id)
-            payload = {"data" : []}
-            r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+            uri = "/xyz/openbmc_project/logging/entry/{}/action/Delete".format(
+                id)
+            payload = {"data": []}
+            r = self.conf.util_bmc_server.post(
+                uri=uri, json=payload, minutes=minutes)
 
     def verify_clear_sel(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -291,16 +319,17 @@ class HostManagement():
         '''
         log.debug("Clearing ALL SELs DeleteAll")
         uri = "/xyz/openbmc_project/logging/action/DeleteAll"
-        payload = {"data" : []}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": []}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
 
     def get_current_bootdev(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
         Current Boot Device Info
         GET
-        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/bootmode
+        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/BootMode
         '''
-        uri = "/xyz/openbmc_project/control/host0/boot/attr/bootmode"
+        uri = "/xyz/openbmc_project/control/host0/boot/attr/BootMode"
         r = self.conf.util_bmc_server.get(uri=uri, minutes=minutes)
         json_data = r.json().get('data')
         bootmode = ""
@@ -314,37 +343,41 @@ class HostManagement():
         '''
         Set boot device to setup
         PUT
-        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/bootmode
+        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/BootMode
         "data": "xyz.openbmc_project.Control.Boot.Mode.Modes.Setup"
 
-        https://bmcip/xyz/openbmc_project/control/host0/boot/one_time/attr/enabled
+        https://bmcip/xyz/openbmc_project/control/host0/boot/one_time/attr/Enabled
         "data": 0
         '''
-        uri = "/xyz/openbmc_project/control/host0/boot/attr/bootmode"
+        uri = "/xyz/openbmc_project/control/host0/boot/attr/BootMode"
         payload = {"data": "xyz.openbmc_project.Control.Boot.Mode.Modes.Setup"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
-        uri = "/xyz/openbmc_project/control/host0/boot/one_time/attr/enabled"
+        uri = "/xyz/openbmc_project/control/host0/boot/one_time/attr/Enabled"
         payload = {"data": 0}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def set_bootdev_to_none(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
         Set boot device to regular/default
         PUT
-        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/bootmode
+        https://bmcip/xyz/openbmc_project/control/host0/boot/attr/BootMode
         "data": "xyz.openbmc_project.Control.Boot.Mode.Modes.Regular"
 
-        https://bmcip/xyz/openbmc_project/control/host0/boot/one_time/attr/enabled
+        https://bmcip/xyz/openbmc_project/control/host0/boot/one_time/attr/Enabled
         "data": 0
         '''
-        uri = "/xyz/openbmc_project/control/host0/boot/attr/bootmode"
-        payload = {"data" : "xyz.openbmc_project.Control.Boot.Mode.Modes.Regular"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        uri = "/xyz/openbmc_project/control/host0/boot/attr/BootMode"
+        payload = {"data": "xyz.openbmc_project.Control.Boot.Mode.Modes.Regular"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
-        uri = "/xyz/openbmc_project/control/host0/boot/one_time/attr/enabled"
+        uri = "/xyz/openbmc_project/control/host0/boot/one_time/attr/Enabled"
         payload = {"data": 0}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def get_boot_progress(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -364,9 +397,10 @@ class HostManagement():
         "data" : []
         '''
         status = self.wait_bmc(token="/xyz/openbmc_project/state/host{}".format(host),
-                     key="CurrentHostState",
-                     value_target="xyz.openbmc_project.State.Host.HostState.{}".format(target_state),
-                     minutes=minutes)
+                               key="CurrentHostState",
+                               value_target="xyz.openbmc_project.State.Host.HostState.{}".format(
+                                   target_state),
+                               minutes=minutes)
         return status
 
     def wait_for_standby(self, timeout=10):
@@ -389,12 +423,14 @@ class HostManagement():
         "data" : "xyz.openbmc_project.State.BMC.Transition.Reboot"
         '''
         uri = "/xyz/openbmc_project/state/bmc0/attr/RequestedBMCTransition"
-        payload = {"data" : "xyz.openbmc_project.State.BMC.Transition.Reboot"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": "xyz.openbmc_project.State.BMC.Transition.Reboot"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
         # Wait for BMC to go down.
         self.util.ping_fail_check(self.hostname)
         # Wait for BMC to ping back.
-        self.util.PingFunc(self.hostname, totalSleepTime=BMC_CONST.PING_RETRY_POWERCYCLE)
+        self.util.PingFunc(
+            self.hostname, totalSleepTime=BMC_CONST.PING_RETRY_POWERCYCLE)
         # Wait for BMC ready state.
         self.wait_for_bmc_runtime()
 
@@ -406,8 +442,10 @@ class HostManagement():
         uri = "/xyz/openbmc_project/state/bmc0/attr/CurrentBMCState"
         r = self.conf.util_bmc_server.get(uri=uri)
         if r.status_code != requests.codes.ok:
-            problem = "[{}] Description={}".format(r.json().get('message'), "".join(r.json().get('data').get('description')))
-            raise HTTPCheck(message="HTTP problem getting CurrentBMCState {}".format(problem))
+            problem = "[{}] Description={}".format(r.json().get(
+                'message'), "".join(r.json().get('data').get('description')))
+            raise HTTPCheck(
+                message="HTTP problem getting CurrentBMCState {}".format(problem))
         return r.json().get('data')
 
     def wait_bmc(self, key=None, value_target=None, token=None, minutes=10):
@@ -431,8 +469,10 @@ class HostManagement():
                 if value_target in r.json().get('data'):
                     break
             if time.time() > timeout:
-                log.warning("We timed out waiting for \"{}\", we waited {} minutes for \"{}\"".format(token, minutes, value_target))
-                raise HTTPCheck(message="HTTP problem getting \"{}\", we waited {} minutes for \"{}\"".format(token, minutes, value_target))
+                log.warning("We timed out waiting for \"{}\", we waited {} minutes for \"{}\"".format(
+                    token, minutes, value_target))
+                raise HTTPCheck(message="HTTP problem getting \"{}\", we waited {} minutes for \"{}\"".format(
+                    token, minutes, value_target))
             time.sleep(5)
         return True
 
@@ -441,8 +481,8 @@ class HostManagement():
         Wait for BMC Runtime
         '''
         status = self.wait_bmc(token="/xyz/openbmc_project/state/bmc0/attr/CurrentBMCState",
-                     value_target="xyz.openbmc_project.State.BMC.BMCState.Ready",
-                     minutes=timeout)
+                               value_target="xyz.openbmc_project.State.BMC.BMCState.Ready",
+                               minutes=timeout)
         return status
 
     def get_list_of_image_ids(self, minutes=BMC_CONST.HTTP_RETRY):
@@ -456,6 +496,7 @@ class HostManagement():
         log.debug("Image IDs={}".format(r.json()))
         ids = []
         for k in r.json().get('data'):
+            log.debug("Image Data Info k={}".format(k))
             m = re.match(r'/xyz/openbmc_project/software/(.*)', k)
             # According to the OpenBMC docs, Image ID can be
             # Implementation defined, and thus, the word 'active'
@@ -472,6 +513,7 @@ class HostManagement():
             # like the 'active' or (new) 'functional'.
             # Adriana has promised me that this is safe into the future.
             if m:
+                log.debug("Image Data Info ID={}: {}".format(m.group(1), k))
                 i = self.image_data(m.group(1))
                 if i['data'].get('Purpose') is not None:
                     ids.append(m.group(1))
@@ -499,14 +541,14 @@ class HostManagement():
         '''
         with open(image, 'rb') as fileload:
             uri = "/upload/image"
-            octet_hdr = { 'Content-Type': 'application/octet-stream' }
+            octet_hdr = {'Content-Type': 'application/octet-stream'}
             r = self.conf.util_bmc_server.post(uri=uri,
                                                headers=octet_hdr,
                                                data=fileload)
             if r.status_code != 200:
-                print r.headers
-                print r.text
-                print r
+                print((r.headers))
+                print((r.text))
+                print(r)
 
     def get_image_priority(self, id, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -514,6 +556,11 @@ class HostManagement():
         '''
         json_data = self.image_data(id, minutes=minutes)
         log.debug("Image Data: {}".format(json_data))
+        # we use the strings below for easy grepping of debug logs
+        log.debug("Image Data Info ID: {}".format(id))
+        log.debug("Image Data Info Priority: {}".format(json_data.get('data').get('Priority')))
+        log.debug("Image Data Info Purpose: {}".format(json_data.get('data').get('Purpose')))
+        log.debug("Image Data Info Version: {}".format(json_data.get('data').get('Version')))
         return json_data.get('data').get('Priority')
 
     def set_image_priority(self, id, level, minutes=BMC_CONST.HTTP_RETRY):
@@ -523,9 +570,11 @@ class HostManagement():
         https://bmcip/xyz/openbmc_project/software/<id>/attr/Priority
         "data" : 0
         '''
+        # xyz.openbmc_project.Software.RedundancyPriority Priority y 0
         uri = "/xyz/openbmc_project/software/{}/attr/Priority".format(id)
-        payload = {"data" : level}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data" : int(level)}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def image_ready_for_activation(self, id, timeout=10):
         '''
@@ -537,11 +586,12 @@ class HostManagement():
             json_data = self.image_data(id, minutes=BMC_CONST.HTTP_RETRY)
             log.debug("Image JSON : {}".format(json_data))
             if json_data.get('data').get('Activation') \
-                == "xyz.openbmc_project.Software.Activation.Activations.Ready":
+                    == "xyz.openbmc_project.Software.Activation.Activations.Ready":
                 log.debug("Image upload is successful & Ready for activation")
                 break
             if time.time() > timeout:
-                raise HTTPCheck(message="Image is not ready for activation/Timeout happened")
+                raise HTTPCheck(
+                    message="Image is not ready for activation/Timeout happened")
             time.sleep(5)
         return True
 
@@ -552,9 +602,12 @@ class HostManagement():
         https://bmcip/xyz/openbmc_project/software/<image id>/attr/RequestedActivation
         "data": "xyz.openbmc_project.Software.Activation.RequestedActivations.Active"
         '''
-        uri = "/xyz/openbmc_project/software/{}/attr/RequestedActivation".format(id)
-        payload =  {"data" : "xyz.openbmc_project.Software.Activation.RequestedActivations.Active"}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        uri = "/xyz/openbmc_project/software/{}/attr/RequestedActivation".format(
+            id)
+        payload = {
+            "data": "xyz.openbmc_project.Software.Activation.RequestedActivations.Active"}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def delete_image(self, id, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -566,13 +619,15 @@ class HostManagement():
         try:
             # First, we try the "new" method, as of at least ibm-v2.0-0-r26.1-0-gfb7714a
             uri = "/xyz/openbmc_project/software/{}/action/delete".format(id)
-            payload = {"data" : []}
-            r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+            payload = {"data": []}
+            r = self.conf.util_bmc_server.post(
+                uri=uri, json=payload, minutes=minutes)
         except Exception as e:
             # Try falling back to the old method (everything prior? who knows)
             uri = "/xyz/openbmc_project/software/{}".format(id)
-            payload = {"data" : []}
-            r = self.conf.util_bmc_server.delete(uri=uri, json=payload, minutes=minutes)
+            payload = {"data": []}
+            r = self.conf.util_bmc_server.delete(
+                uri=uri, json=payload, minutes=minutes)
 
     def wait_for_image_active_complete(self, id, timeout=10):
         '''
@@ -582,18 +637,23 @@ class HostManagement():
         while True:
             json_data = self.image_data(id, minutes=BMC_CONST.HTTP_RETRY)
             if json_data.get('data').get('Activation') \
-                == "xyz.openbmc_project.Software.Activation.Activations.Activating":
+                    == "xyz.openbmc_project.Software.Activation.Activations.Activating":
                 log.info("Image activation is in progress")
             if json_data.get('data').get('Activation') \
-                == "xyz.openbmc_project.Software.Activation.Activations.Active":
-                log.info("Image activated successfully, Good to go for power on....")
+                    == "xyz.openbmc_project.Software.Activation.Activations.Active":
+                log.info(
+                    "Image activated successfully, Good to go for power on....")
                 break
             if json_data.get('data').get('Activation') \
-                == "xyz.openbmc_project.Software.Activation.Activations.Failed":
-                log.error("Image activation failed. Good luck.")
+                    == "xyz.openbmc_project.Software.Activation.Activations.Failed":
+                log.error("Image activation failed. Try --run testcases.testRestAPI.HostOff.test_field_mode_enable_disable, which leaves field mode disabled.")
+                log.warning("Bug reported SW461922 : OP930:FVT: Software Field mode disable operation does not throw error or warning, future this will not work")
+                log.warning("You need to factory reset the BMC which requires re-setting BMC IP's (BMC serial connection needed due to loss of networking")
+                log.warning("Alternate methods are via BMC busctl commands")
                 return False
             if time.time() > timeout:
-                raise HTTPCheck(message="Image is failed to activate/Timeout happened")
+                raise HTTPCheck(
+                    message="Image is failed to activate/Timeout happened")
             time.sleep(5)
         return True
 
@@ -619,11 +679,11 @@ class HostManagement():
             # Here, we assume that if we don't have 'Purpose' it's something special
             # like the 'active' or (new) 'functional'.
             # Adriana has promised me that this is safe.
-            log.debug("Image ID: {}".format(i))
+            log.debug("Image Data Info ID: {}".format(i))
             if i['data'].get('Purpose') != purpose:
                 log.debug("Removing Image ID: {} "
-                    "Purpose={} does not match purpose={}"
-                    .format(id, i.get('data').get('Purpose'), purpose))
+                          "Purpose={} does not match purpose={}"
+                          .format(id, i.get('data').get('Purpose'), purpose))
                 l.remove(id)
         log.debug("ALL Image IDs: {} purpose={}".format(l, purpose))
         return l
@@ -660,9 +720,10 @@ class HostManagement():
         https://bmcip/download/dump/<id>
         '''
         uri = "/download/dump/{}".format(dump_id)
-        r = self.conf.util_bmc_server.get(uri=uri, stream=True, minutes=minutes)
+        r = self.conf.util_bmc_server.get(
+            uri=uri, stream=True, minutes=minutes)
         value, params = cgi.parse_header(r.headers.get('Content-Disposition'))
-        with open(params.get('filename'), 'wb') as f:
+        with open(os.path.join(self.conf.logdir, params.get('filename')), 'wb') as f:
             f.write(r.content)
 
     def delete_dump(self, dump_id, minutes=BMC_CONST.HTTP_RETRY):
@@ -671,9 +732,11 @@ class HostManagement():
         POST
         https://bmcip/xyz/openbmc_project/dump/entry/<dump_id>/action/Delete
         '''
-        uri = "/xyz/openbmc_project/dump/entry/{}/action/Delete".format(dump_id)
-        payload = {"data" : []}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        uri = "/xyz/openbmc_project/dump/entry/{}/action/Delete".format(
+            dump_id)
+        payload = {"data": []}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
         return r
 
     def delete_all_dumps(self, minutes=BMC_CONST.HTTP_RETRY):
@@ -693,16 +756,19 @@ class HostManagement():
         "data" : []
         '''
         uri = "/xyz/openbmc_project/dump/action/CreateDump"
-        payload = {"data" : []}
+        payload = {"data": []}
         try:
-            r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+            r = self.conf.util_bmc_server.post(
+                uri=uri, json=payload, minutes=minutes)
             log.info("OpenBMC Dump capture was successful")
             return r.json().get('data')
         except Exception as e:
             log.debug("Create Dump Exception={}".format(e))
-            log.info("Dumps are exceeded in the system, trying to delete existing ones")
+            log.info(
+                "Dumps are exceeded in the system, trying to delete existing ones")
             self.delete_all_dumps()
-            r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+            r = self.conf.util_bmc_server.post(
+                uri=uri, json=payload, minutes=minutes)
             log.info("RETRY ATTEMPT OpenBMC Dump capture was successful")
             return r.json().get('data')
 
@@ -713,7 +779,8 @@ class HostManagement():
         for i in range(counter):
             ids = self.get_dump_ids()
             if str(dump_id) in ids:
-                log.debug("Dump ID={} is ready to download/offload".format(dump_id))
+                log.debug(
+                    "Dump ID={} is ready to download/offload".format(dump_id))
                 return True
             time.sleep(5)
         else:
@@ -736,9 +803,13 @@ class HostManagement():
         r = self.software_enumerate(minutes=minutes)
         try:
             if int(r.json().get('data').get('FieldModeEnabled')) == 1:
+                log.debug("has_field_mode_set=1")
                 return True
+            else:
+                log.debug("has_field_mode_set NOT True")
         except Exception as e:
-            log.debug("Unable to get FieldModeEnabled so returning False, Exception={}".format(e))
+            log.debug(
+                "Unable to get FieldModeEnabled so returning False, Exception={}".format(e))
         return False
 
     def set_field_mode(self, mode, minutes=BMC_CONST.HTTP_RETRY):
@@ -749,8 +820,10 @@ class HostManagement():
         "data": 0
         '''
         uri = "/xyz/openbmc_project/software/attr/FieldModeEnabled"
-        payload = {"data" : int(mode)}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": int(mode)}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
+        log.debug("set_field_mode={}".format(r))
 
     def validate_functional_bootside(self, id, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -778,7 +851,7 @@ class HostManagement():
         '''
         json_data = self.image_data(id, minutes=minutes)
         if json_data.get('data').get('Activation') \
-            == "xyz.openbmc_project.Software.Activation.Activations.Active":
+                == "xyz.openbmc_project.Software.Activation.Activations.Active":
             return True
         return False
 
@@ -820,8 +893,9 @@ class HostManagement():
         "data" : 0
         '''
         uri = "/xyz/openbmc_project/control/host0/power_cap/attr/PowerCapEnable"
-        payload = {"data" : int(enable)}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": int(enable)}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def power_cap_enable(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -852,8 +926,9 @@ class HostManagement():
         https://bmcip/org/open_power/control/gard/action/Reset
         '''
         uri = "/org/open_power/control/gard/action/Reset"
-        payload = {"data" : []}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": []}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
 
     def factory_reset_software(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -862,8 +937,9 @@ class HostManagement():
         "data": []"
         '''
         uri = "/xyz/openbmc_project/software/action/Reset"
-        payload = {"data" : []}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": []}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
 
     def factory_reset_network(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -872,8 +948,9 @@ class HostManagement():
         "data": []"
         '''
         uri = "/xyz/openbmc_project/network/action/Reset"
-        payload = {"data" : []}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": []}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
 
     def update_root_password(self, password, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -883,8 +960,9 @@ class HostManagement():
         "data" : ["abc123"]
         '''
         uri = "/xyz/openbmc_project/user/root/action/SetPassword"
-        payload = {"data" : [str(password)]}
-        r = self.conf.util_bmc_server.post(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": [str(password)]}
+        r = self.conf.util_bmc_server.post(
+            uri=uri, json=payload, minutes=minutes)
 
     def is_tpm_enabled(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -895,8 +973,8 @@ class HostManagement():
         uri = "/xyz/openbmc_project/control/host0/TPMEnable"
         r = self.conf.util_bmc_server.get(uri=uri, minutes=minutes)
         if r.json().get('data').get('TPMEnable') == 1:
-          log.debug("# TPMEnable is set")
-          return True
+            log.debug("# TPMEnable is set")
+            return True
         log.debug("# TPMEnable is cleared")
         return False
 
@@ -908,8 +986,9 @@ class HostManagement():
         "data" : 1
         '''
         uri = "/xyz/openbmc_project/control/host0/TPMEnable/attr/TPMEnable"
-        payload = {"data" : int(bit)}
-        r = self.conf.util_bmc_server.put(uri=uri, json=payload, minutes=minutes)
+        payload = {"data": int(bit)}
+        r = self.conf.util_bmc_server.put(
+            uri=uri, json=payload, minutes=minutes)
 
     def enable_tpm(self, minutes=BMC_CONST.HTTP_RETRY):
         '''
@@ -923,10 +1002,11 @@ class HostManagement():
         '''
         self.configure_tpm_enable(0)
 
+
 class OpTestOpenBMC():
     def __init__(self, ip=None, username=None, password=None, ipmi=None,
-            rest_api=None, logfile=sys.stdout,
-            check_ssh_keys=False, known_hosts_file=None):
+                 rest_api=None, logfile=sys.stdout,
+                 check_ssh_keys=False, known_hosts_file=None):
         self.hostname = ip
         self.username = username
         self.password = password
@@ -935,36 +1015,60 @@ class OpTestOpenBMC():
         self.has_vpnor = None
         self.logfile = logfile
         self.console = OpTestSSH(ip, username, password, port=2200,
-                logfile=self.logfile, check_ssh_keys=check_ssh_keys,
-                known_hosts_file=known_hosts_file)
+                                 logfile=self.logfile, check_ssh_keys=check_ssh_keys,
+                                 known_hosts_file=known_hosts_file)
         self.bmc = OpTestBMC(ip=self.hostname,
-                            username=self.username,
-                            password=self.password,
-                            check_ssh_keys=check_ssh_keys,
-                            known_hosts_file=known_hosts_file)
+                             username=self.username,
+                             password=self.password,
+                             logfile=self.logfile,
+                             check_ssh_keys=check_ssh_keys,
+                             known_hosts_file=known_hosts_file)
 
     def set_system(self, system):
         self.console.set_system(system)
         self.bmc.set_system(system)
 
-    def has_new_pnor_code_update(self, minutes=BMC_CONST.HTTP_RETRY):
+    def query_vpnor(self, minutes=BMC_CONST.HTTP_RETRY):
         if self.has_vpnor is not None:
             return self.has_vpnor
+
+        has_local_share_pnor = True
+        try:
+            self.bmc.run_command("ls -1 /usr/local/share/pnor")
+        except CommandFailed:
+            log.debug("We do not have /usr/local/share/pnor, so has_local_share_pnor=False")
+            has_local_share_pnor = False
+
+        has_pflash = self.bmc.validate_pflash_tool()
+
+        # As of April 2019, now there's APIs for machines using the non-vpnor
+        # layout. So our previous logic of assuming that we should use pflash
+        # only if the API is not there is now invalid.
+        # So we have to guess, as there's no real good documented way to work
+        # out what to do.
+        if not has_local_share_pnor and has_pflash:
+            return False
+
+        log.debug("We are proceeding to validate VPNOR image for Host")
         list = self.rest_api.get_list_of_image_ids(minutes=minutes)
         for id in list:
+            log.debug("id={}".format(id))
             i = self.rest_api.image_data(id)
             if i['data'].get('Purpose') == 'xyz.openbmc_project.Software.Version.VersionPurpose.Host':
                 log.debug("Host image")
                 self.has_vpnor = True
                 return True
-        log.debug("# Checking for pflash on BMC to determine update method")
-        self.has_vpnor = not self.bmc.validate_pflash_tool()
-        return self.has_vpnor
+        # if we got this far we should return and say we don't have anything
+        return False
 
     def reboot(self):
         self.bmc.reboot()
         # After a BMC reboot, wait for it to reach ready state
         self.rest_api.wait_for_bmc_runtime()
+
+    def reboot_nowait(self):
+        # Reboot BMC but do not wait for it to come back
+        self.bmc.reboot_nowait()
 
     def image_transfer(self, i_imageName, copy_as=None):
         self.bmc.image_transfer(i_imageName, copy_as=copy_as)
@@ -973,34 +1077,45 @@ class OpTestOpenBMC():
         self.bmc.pnor_img_flash_openbmc(pnor_name)
 
     def skiboot_img_flash_openbmc(self, lid_name):
-        if not self.has_new_pnor_code_update():
+        if not self.query_vpnor():
+            log.debug("We do NOT have vpnor, so calling old pflash")
             self.bmc.skiboot_img_flash_openbmc(lid_name)
         else:
             # don't ask. There appears to be a bug where we need to be 4k aligned.
-            self.bmc.run_command("dd if=/dev/zero of=/dev/stdout bs=1M count=1 | tr '\\000' '\\377' > /tmp/ones")
-            self.bmc.run_command("cat /tmp/%s /tmp/ones > /tmp/padded" % lid_name)
-            self.bmc.run_command("dd if=/tmp/padded of=/usr/local/share/pnor/PAYLOAD bs=1M count=1")
+            self.bmc.run_command(
+                "dd if=/dev/zero of=/dev/stdout bs=1M count=1 | tr '\\000' '\\377' > /tmp/ones")
+            self.bmc.run_command(
+                "cat /tmp/%s /tmp/ones > /tmp/padded" % lid_name)
+            self.bmc.run_command(
+                "dd if=/tmp/padded of=/usr/local/share/pnor/PAYLOAD bs=1M count=1")
             #self.bmc.run_command("mv /tmp/%s /usr/local/share/pnor/PAYLOAD" % lid_name, timeout=60)
 
     def skiroot_img_flash_openbmc(self, lid_name):
-        if not self.has_new_pnor_code_update():
+        if not self.query_vpnor():
             self.bmc.skiroot_img_flash_openbmc(lid_name)
         else:
             # don't ask. There appears to be a bug where we need to be 4k aligned.
-            self.bmc.run_command("dd if=/dev/zero of=/dev/stdout bs=16M count=1 | tr '\\000' '\\377' > /tmp/ones")
-            self.bmc.run_command("cat /tmp/%s /tmp/ones > /tmp/padded" % lid_name)
-            self.bmc.run_command("dd if=/tmp/padded of=/usr/local/share/pnor/BOOTKERNEL bs=16M count=1")
-            #self.bmc.run_command("mv /tmp/%s /usr/local/share/pnor/BOOTKERNEL" % lid_name, timeout=60)
+            #self.bmc.run_command("dd if=/dev/zero of=/dev/stdout bs=16M count=1 | tr '\\000' '\\377' > /tmp/ones")
+            #self.bmc.run_command("cat /tmp/%s /tmp/ones > /tmp/padded" % lid_name)
+            try:
+                # seems the success on following command gives echo $?=1
+                #self.bmc.run_command("dd if=/tmp/padded of=/usr/local/share/pnor/BOOTKERNEL bs=16M count=1")
+                self.bmc.run_command("rm -f /usr/local/share/pnor/BOOTKERNEL", timeout=60)
+                self.bmc.run_command("ln -s /tmp/{} /usr/local/share/pnor/BOOTKERNEL".format(lid_name), timeout=60)
+            except CommandFailed as e:
+                log.warning("FLASHING CommandFailed, check that this is ok for your setup")
 
     def flash_part_openbmc(self, lid_name, part_name):
-        if not self.has_new_pnor_code_update():
+        if not self.query_vpnor():
             self.bmc.flash_part_openbmc(lid_name, part_name)
         else:
-            self.bmc.run_command("mv /tmp/%s /usr/local/share/pnor/%s" % (lid_name, part_name), timeout=60)
+            self.bmc.run_command(
+                "mv /tmp/%s /usr/local/share/pnor/%s" % (lid_name, part_name), timeout=60)
 
     def clear_field_mode(self):
         self.bmc.run_command("fw_setenv fieldmode")
         self.bmc.run_command("systemctl unmask usr-local.mount")
+        log.info("clear_field_mode rebooting the BMC")
         self.reboot()
 
     def bmc_host(self):

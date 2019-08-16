@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
 # OpenPOWER Automated Test Project
 #
 # Contributors Listed Below - COPYRIGHT 2018
@@ -34,9 +34,9 @@ import pexpect
 import os
 
 import OpTestConfiguration
-from OpTestSystem import OpSystemState
-from Exceptions import CommandFailed
-from OpTestIPMI import IPMIConsoleState
+from .OpTestSystem import OpSystemState
+from .Exceptions import CommandFailed
+from .OpTestIPMI import IPMIConsoleState
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -49,6 +49,7 @@ class OpSOLMonitorThread(threading.Thread):
     This thread just monitors the SOL console for any failures when tests are running
     on other SSH threads
     '''
+
     def __init__(self, threadID, name, execution_time=None):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -60,7 +61,7 @@ class OpSOLMonitorThread(threading.Thread):
         logfile = os.path.join(conf.output, "console.log")
         self.sol_logger(logfile)
         self.c = self.system.console.get_console(logger=self.logger)
-        self.c_terminate = False;
+        self.c_terminate = False
 
     def run(self):
         log.debug("Starting %s" % self.name)
@@ -105,9 +106,61 @@ class OpSOLMonitorThread(threading.Thread):
 
     def sol_logger(self, logfile):
         '''
-	Non fomated console log.
+        Non fomated console log.
         '''
         self.logger = logging.getLogger("sol-thread")
         self.logger.setLevel(logging.DEBUG)
-        file_handler = RotatingFileHandler(logfile, maxBytes=2000000, backupCount=10)
+        file_handler = RotatingFileHandler(
+            logfile, maxBytes=2000000, backupCount=10)
         self.logger.addHandler(file_handler)
+
+
+class OpSOLMonitorThreadVM(threading.Thread):
+    '''
+    This thread just monitors the SOL console for any failures when tests are running
+    on other SSH threads. This thread can be terminated by just calling console_terminate
+    from parent process.
+    '''
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+        conf = OpTestConfiguration.conf
+        self.system = conf.system()
+        self.hmc = self.system.hmc
+        self.hmc.poweron_lpar()
+        self.c = self.hmc.get_console()
+        self.c_terminate = False
+
+    def run(self):
+        log.info("Starting PowerVM console monitoring thread")
+        while True:
+            try:
+                rc = self.c.expect(["\n", "Connection has closed"], timeout=60)
+                if rc == 1:
+                    log.info("LPAR console is gone")
+                    while True:
+                        if self.hmc.check_vterm():
+                            time.sleep(5)
+                            log.debug("Waiting for console")
+                        else:
+                            self.c = self.hmc.get_console()
+                            break
+            except pexpect.TIMEOUT:
+                pass
+            except pexpect.EOF:
+                log.info("LPAR console is gone")
+                while True:
+                    if self.hmc.check_vterm():
+                        time.sleep(5)
+                        log.debug("Waiting for console")
+                    else:
+                        self.c = self.hmc.get_console()
+                        break
+
+            if self.c_terminate:
+                break
+        log.debug("Terminating SOL monitoring thread")
+
+    def console_terminate(self):
+        self.hmc.close_console(self.c)
+        self.c_terminate = True

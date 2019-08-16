@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # encoding=utf8
 # IBM_PROLOG_BEGIN_TAG
 # This is an automatically generated prolog.
@@ -39,21 +39,17 @@ import subprocess
 import os
 import pexpect
 import sys
-import commands
+import subprocess
 
-from OpTestConstants import OpTestConstants as BMC_CONST
-from OpTestError import OpTestError
+from .OpTestConstants import OpTestConstants as BMC_CONST
+from .OpTestError import OpTestError
 
-import cookielib
-import urllib
-import urllib2
+import http.cookiejar
+import urllib.request
+import urllib.parse
+import urllib.error
 import re
 import ssl
-# Work around issues with python < 2.7.9
-try:
-    ssl._create_default_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
 
 
 class OpTestASM:
@@ -62,10 +58,14 @@ class OpTestASM:
         self.user_name = i_fspUser
         self.password = i_fspPasswd
         self.url = "https://%s/cgi-bin/cgi?" % self.host_name
-        self.cj = cookielib.CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
+        self.cj = http.cookiejar.CookieJar()
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
         opener.addheaders = [('User-agent', 'LTCTest')]
-        urllib2.install_opener(opener)
+        opener.add_handler(urllib.request.HTTPCookieProcessor(self.cj))
+        urllib.request.install_opener(opener)
         self.setforms()
 
     def setforms(self):
@@ -83,33 +83,27 @@ class OpTestASM:
     def getcsrf(self, form):
         while True:
             try:
-                myurl = urllib2.urlopen(self.url+form, timeout=10)
-            except urllib2.URLError:
+                myurl = urllib.request.urlopen(self.url+form, timeout=10)
+            except urllib.error.URLError:
                 time.sleep(2)
                 continue
             break
-        out = myurl.read()
+        out = myurl.read().decode("utf-8")
         if 'CSRF_TOKEN' in out:
             return re.findall('CSRF_TOKEN.*value=\'(.*)\'', out)[0]
         else:
             return '0'
 
     def getpage(self, form):
-        while True:
-            try:
-                myurl = urllib2.urlopen(self.url+form, timeout=60)
-            except (urllib2.URLError, ssl.SSLError):
-                time.sleep(2)
-                continue
-            break
-        return myurl.read()
+        myurl = urllib.request.urlopen(self.url+form, timeout=60)
+        return myurl.read().decode("utf-8")
 
     def submit(self, form, param):
         param['CSRF_TOKEN'] = self.getcsrf(form)
-        data = urllib.urlencode(param)
-        req = urllib2.Request(self.url+form, data)
+        data = urllib.parse.urlencode(param).encode("utf-8")
+        req = urllib.request.Request(self.url+form, data)
 
-        return urllib2.urlopen(req)
+        return urllib.request.urlopen(req)
 
     def login(self):
         if not len(self.cj) == 0:
@@ -120,15 +114,22 @@ class OpTestASM:
                  'lang':      '0',
                  'CSRF_TOKEN': ''}
         form = "form=2"
-        self.submit(form, param)
+        resp = self.submit(form, param)
 
         count = 0
         while count < 2:
             if not len(self.cj) == 0:
                 break
+
+            # the login can quietly fail because the FSP has 'too many users' logged in,
+            # even though it actually doesn't.  let's check to see if this is the case
+            # by trying a request.
+            if "Too many users" in self.getpage("form=2"):
+                raise OpTestError("FSP reports 'Too many users', FSP needs power cycle")
+
             time.sleep(10)
             self.submit(form, param)
-            msg = "Login Failed with user:%s and password:%s".format(
+            msg = "Login failed with user:{0} and password:{1}".format(
                 self.user_name, self.password)
             print(msg)
             count += 1

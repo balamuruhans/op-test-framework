@@ -1,23 +1,23 @@
 ## OpenPower Test Framework ##
 
 This repository provides a collection of tools that enable automated testing of
-OpenPower systems. The op-test-framework suite is designed to test a machine
+OpenPower systems. The op-test suite is designed to test a machine
 largely out of band - that is, it is designed for tests that do things like
 power cycle the machine, test booting different configurations. As part of
-the op-test-framework, we may run tests on the host itself (such as fwts
+the op-test, we may run tests on the host itself (such as fwts
 and HTX)
 
 The end goal is to have a collection of tests that can be run against any
 OpenPower system to validate it's function. The tests are automation/jenkins
 ready.
 
-For full documentation, visit http://open-power.github.io/op-test-framework/
+For full documentation, visit http://open-power.github.io/op-test/
 
 ### Quick Start ###
 
-OVERVIEW - Clone op-test-framework on some linux box, like your laptop.
+OVERVIEW - Clone op-test on some linux box, like your laptop.
 
-git clone https://github.com/open-power/op-test-framework
+git clone https://github.com/open-power/op-test
 
 Prepare the OpenPower system with needed software packages and build the
 needed tools (see below Target System Requirements).
@@ -28,14 +28,15 @@ Run something (see below Running the tests).
 
 This framework runs on most Linux based systems.
 
-You need python 2.7 or greater and also needs below modules to be installed
+You need python 3.6 or greater as well as pip:
 
-    pip install pexpect importlib ptyprocess requests pysocks
+    apt install python3 python3-pip
 
-    Optionally:  pip install unittest-xml-reporting unittest2
-    For XML output: sudo apt-get install python-xmlrunner
+and to install the python dependencies:
 
-    For qemu: sudo apt-get install qemu-utils
+    pip3 install -r requirements.txt
+
+    For qemu: apt install qemu-utils
 
 You will also need below packages to be installed
 
@@ -46,8 +47,12 @@ the BMC and the host of the machine(s) you're testing.
 
 ### Preparation ###
 
-The target system will need to have an OS that can boot. That OS will
-need to have several things installed on it.
+The target system will need to have a Host OS that can boot.
+The Host OS will need to have several things installed on it.
+
+This is a one time setup for the Host OS.  If you reinstall the
+Host OS then these steps will need to be completed again to
+prepare the Host OS for tests.
 
 ### Target System Requirements ###
 
@@ -77,13 +82,20 @@ On RHEL-like systems, package names are:
 
     lm_sensors ipmitool i2c-tools pciutils kernel-tools dtc
 
-From skiboot, you will need the xscom-utils and gard installed:
+On the Host OS, you will need to clone the skiboot source and then
+build the following latest utilities.
 
+    On the Host OS clone the skiboot source:
     git clone https://github.com/open-power/skiboot
+
+    Then:
     cd skiboot/external/xscom-utils
     make
     sudo make install
     cd ../gard
+    make
+    sudo make install
+    cd ../pflash
     make
     sudo make install
 

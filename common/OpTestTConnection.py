@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # encoding=utf8
 # IBM_PROLOG_BEGIN_TAG
 # This is an automatically generated prolog.
@@ -25,18 +25,28 @@
 #
 # IBM_PROLOG_END_TAG
 
-## @package OpTestTConnection
+# @package OpTestTConnection
 #  TConnection-API to telnet connection
-#  This library of tconnection can use in cases if any platform has 
+#  This library of tconnection can use in cases if any platform has
 #  telnet connection to their SP/MC.(i.e EX: FSP uses tenet connection)
+
+# ruscur: Some notes on Python 3 conversion.
+# There's a lot of yucky string/byte conversion in here: telnetlib needs
+# everything to be bytes (which is fair enough since it's telnet), but
+# we don't want the callers of this library to have to do the conversions
+# constantly themselves, so in this file we should expect to be given
+# strings and to return strings - even though that makes things harder.
 
 import telnetlib
 
+
 class NoLoginPrompt(Exception):
-    def __init__(self,output):
-        self.output=output
+    def __init__(self, output):
+        self.output = output
+
     def __str__(self):
         return "No login prompt found, instead got: {}".format(repr(self.output))
+
 
 class TConnection():
 
@@ -49,13 +59,12 @@ class TConnection():
     # @param prompt @type string: $ or # type of prompt
     #
     def __init__(self, host_name, user_name, password, prompt):
-        # We *explicitly* convert to bytes() (i.e. str() in py2.7)
-        # as otherwise telnetlib will cry about telnet not being
-        # 7bit ascii. (seriously).
-        self.host_name = bytes(host_name)
-        self.user_name = bytes(user_name)
-        self.password = bytes(password)
-        self.prompt = bytes(prompt)
+        # These have to be bytes(), but we can't just convert it because the strings
+        # need an explicit encoding, which they don't have. (sigh)
+        self.host_name = bytes(host_name.encode('ascii'))
+        self.user_name = bytes(user_name.encode('ascii'))
+        self.password = bytes(password.encode('ascii'))
+        self.prompt = bytes(prompt.encode('ascii'))
         self.tn = None
 
     ##
@@ -63,11 +72,11 @@ class TConnection():
     #
     def login(self):
         self.tn = telnetlib.Telnet(self.host_name)
-        self.tn.read_until('login: ')
-        self.tn.write(self.user_name + '\n')
-        self.tn.read_until('assword: ')
-        self.tn.write(self.password + '\n')
-        ret=self.tn.read_until(self.prompt)
+        self.tn.read_until(b'login: ')
+        self.tn.write(self.user_name + b'\n')
+        self.tn.read_until(b'assword: ')
+        self.tn.write(self.password + b'\n')
+        ret = self.tn.read_until(self.prompt)
         if not self.prompt in ret:
             raise NoLoginPrompt(ret)
 
@@ -76,12 +85,14 @@ class TConnection():
     # @param command @type string: command to run
     #
     def run_command(self, command):
-        self.tn.write(command + '\n')
+        command = bytes(command.encode('ascii'))
+        self.tn.write(command + b'\n')
         response = self.tn.read_until(self.prompt)
         return self._send_only_result(command, response)
 
-    def issue_forget(self,command):
-        self.tn.write(command + '\n')
+    def issue_forget(self, command):
+        command = bytes(command.encode('ascii'))
+        self.tn.write(command + b'\n')
         response = self.tn.read_very_eager()
         return self._send_only_result(command, response)
 
@@ -90,7 +101,7 @@ class TConnection():
         if command in output[0]:
             output.pop(0)
         output.pop()
-        output = [ element.lstrip()+'\n' for element in output]
-        response = ''.join(output)
+        output = [element.lstrip().decode('utf-8') for element in output]
+        response = '\n'.join(output)
         response = response.strip()
         return ''.join(response)

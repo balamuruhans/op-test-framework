@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # OpenPOWER Automated Test Project
 #
 # Contributors Listed Below - COPYRIGHT 2017
@@ -55,7 +55,7 @@ class Console():
     def runTest(self):
         self.cv_SYSTEM.goto_state(OpSystemState.PETITBOOT_SHELL)
         console = self.cv_BMC.get_host_console()
-        adjustment = 3 # mambo echo now disabled in initial setup
+        adjustment = 3  # mambo echo now disabled in initial setup
         bs = self.bs
         count = self.count
         self.assertTrue((bs * count) % 16 == 0,
@@ -136,11 +136,18 @@ class ControlC(unittest.TestCase):
         timeout = 60
         try:
             rc = raw_pty.expect([BMC_DISCONNECT, self.prompt,
-                                     pexpect.TIMEOUT, pexpect.EOF], timeout)
+                                 pexpect.TIMEOUT, pexpect.EOF], timeout)
             if rc == 0:
                 raise BMCDisconnected(BMC_DISCONNECT)
             self.assertEqual(rc, 1, "Failed to find expected prompt")
         except pexpect.TIMEOUT as e:
+            raw_pty.sendcontrol('z')
+            rc = raw_pty.expect([self.prompt, pexpect.TIMEOUT], 10)
+            if rc == 0:
+                console.run_command_ignore_fail("kill %1")
+                console.run_command_ignore_fail("fg")
+                self.fail("Had to ctrl-z rather than ctrl-c")
+                pass
             log.debug(e)
             log.debug("# TIMEOUT waiting for command to finish with ctrl-c.")
             log.debug("# Everything is terrible. Fail the world, "
